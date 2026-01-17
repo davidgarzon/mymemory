@@ -4,6 +4,7 @@ import Inbox from './pages/Inbox';
 import People from './pages/People';
 import Meetings from './pages/Meetings';
 import Outbox from './pages/Outbox';
+import PromptLab from './pages/PromptLab';
 import Debug from './pages/Debug';
 
 export default function App() {
@@ -19,6 +20,8 @@ export default function App() {
         return <Meetings />;
       case 'outbox':
         return <Outbox />;
+      case 'promptlab':
+        return <PromptLab />;
       case 'debug':
         return <Debug />;
       default:

@@ -115,3 +115,38 @@ export async function markItemAsDiscussed(itemId) {
     throw new Error(`Error al marcar item: ${err.message}`);
   }
 }
+
+// Prompt Lab API
+export async function listPromptBlocks() {
+  return fetchAPI('/debug/prompt');
+}
+
+export async function savePromptBlock(block) {
+  return fetchAPI('/debug/prompt', {
+    method: 'POST',
+    body: JSON.stringify(block),
+  });
+}
+
+export async function deletePromptBlock(blockId) {
+  return fetchAPI(`/debug/prompt/${blockId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function resetPromptBlocks() {
+  return fetchAPI('/debug/prompt/reset', {
+    method: 'POST',
+  });
+}
+
+export async function getActivePrompt() {
+  return fetchAPI('/debug/prompt/active');
+}
+
+export async function testPrompt(text) {
+  return fetchAPI('/debug/prompt/test', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+}
