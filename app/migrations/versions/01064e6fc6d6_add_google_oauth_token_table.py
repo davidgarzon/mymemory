@@ -1,7 +1,7 @@
 """add google_oauth_token table
 
 Revision ID: 01064e6fc6d6
-Revises: 4a5b6c7d8e9f
+Revises: 52ec1cb1b1eb
 Create Date: 2026-01-16 22:55:24.461399
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '01064e6fc6d6'
-down_revision: Union[str, None] = '4a5b6c7d8e9f'
+down_revision: Union[str, None] = '52ec1cb1b1eb'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
