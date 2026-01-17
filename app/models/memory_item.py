@@ -27,6 +27,7 @@ class MemoryItem(Base):
     type = Column(SQLEnum(MemoryItemType), nullable=False, index=True)
     content = Column(Text, nullable=False)
     normalized_summary = Column(Text, nullable=True)
+    content_fingerprint = Column(String, nullable=True, index=True)
     related_person_id = Column(UUID(as_uuid=True), ForeignKey("person.id"), nullable=True, index=True)
     due_at = Column(DateTime, nullable=True)
     status = Column(SQLEnum(MemoryItemStatus), nullable=False, default=MemoryItemStatus.PENDING, index=True)

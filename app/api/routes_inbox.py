@@ -8,6 +8,7 @@ from app.core.db import get_db
 from app.models import MemoryItem, MemoryItemType, MemoryItemStatus, Person
 from app.services.intent_parser import parse_intent
 from app.services.person_service import get_or_create_person
+from app.services.content_normalizer import normalize_content, content_fingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -61,16 +62,48 @@ def process_inbox_text(
             person = get_or_create_person(db, data["related_person_name"])
             related_person_id = person.id
         
-        # Create memory item
-        memory_item = MemoryItem(
-            type=memory_type,
-            content=data["content"],
-            related_person_id=related_person_id,
-            status=MemoryItemStatus.PENDING,
+        # Normalize content and calculate fingerprint
+        normalized_content = normalize_content(data["content"])
+        fingerprint = content_fingerprint(normalized_content)
+        
+        # Check for existing similar MemoryItem
+        existing_query = db.query(MemoryItem).filter(
+            MemoryItem.status == MemoryItemStatus.PENDING,
+            MemoryItem.content_fingerprint == fingerprint
         )
-        db.add(memory_item)
-        db.commit()
-        db.refresh(memory_item)
+        
+        # Filter by same person (both null or same ID)
+        if related_person_id:
+            existing_query = existing_query.filter(
+                MemoryItem.related_person_id == related_person_id
+            )
+        else:
+            existing_query = existing_query.filter(
+                MemoryItem.related_person_id.is_(None)
+            )
+        
+        existing_item = existing_query.first()
+        
+        if existing_item:
+            # Reuse existing item
+            memory_item = existing_item
+            created = False
+            detail_msg = "Ya lo tenía apuntado"
+        else:
+            # Create new memory item
+            memory_item = MemoryItem(
+                type=memory_type,
+                content=data["content"],
+                normalized_summary=normalized_content,
+                content_fingerprint=fingerprint,
+                related_person_id=related_person_id,
+                status=MemoryItemStatus.PENDING,
+            )
+            db.add(memory_item)
+            db.commit()
+            db.refresh(memory_item)
+            created = True
+            detail_msg = None
         
         # Get person name for response
         person_name = None
@@ -80,8 +113,8 @@ def process_inbox_text(
         return InboxResponse(
             ok=True,
             intent=intent,
-            detail=None,
-            created=True,
+            detail=detail_msg,
+            created=created,
             memory_item={
                 "id": str(memory_item.id),
                 "type": memory_item.type.value,
