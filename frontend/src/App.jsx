@@ -1,50 +1,43 @@
 import React, { useState } from 'react';
+import Sidebar from './components/Sidebar';
 import Inbox from './pages/Inbox';
 import People from './pages/People';
-import Events from './pages/Events';
+import Meetings from './pages/Meetings';
 import Outbox from './pages/Outbox';
+import Debug from './pages/Debug';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('inbox');
 
-  return (
-    <div>
-      <h1>My Memory - Testing Cognitivo</h1>
-      <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
-        Frontend de testing para observar cómo piensa el sistema. El backend es la única fuente de verdad.
-      </p>
-      
-      <div className="nav">
-        <button
-          className={currentPage === 'inbox' ? 'active' : ''}
-          onClick={() => setCurrentPage('inbox')}
-        >
-          Inbox
-        </button>
-        <button
-          className={currentPage === 'people' ? 'active' : ''}
-          onClick={() => setCurrentPage('people')}
-        >
-          People
-        </button>
-        <button
-          className={currentPage === 'events' ? 'active' : ''}
-          onClick={() => setCurrentPage('events')}
-        >
-          Events
-        </button>
-        <button
-          className={currentPage === 'outbox' ? 'active' : ''}
-          onClick={() => setCurrentPage('outbox')}
-        >
-          Outbox
-        </button>
-      </div>
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'inbox':
+        return <Inbox />;
+      case 'people':
+        return <People />;
+      case 'meetings':
+        return <Meetings />;
+      case 'outbox':
+        return <Outbox />;
+      case 'debug':
+        return <Debug />;
+      default:
+        return <Inbox />;
+    }
+  };
 
-      {currentPage === 'inbox' && <Inbox />}
-      {currentPage === 'people' && <People />}
-      {currentPage === 'events' && <Events />}
-      {currentPage === 'outbox' && <Outbox />}
+  return (
+    <div style={{ display: 'flex' }}>
+      <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+      <main style={{
+        marginLeft: '200px',
+        padding: '30px',
+        width: 'calc(100% - 200px)',
+        minHeight: '100vh',
+        background: '#f5f5f5',
+      }}>
+        {renderPage()}
+      </main>
     </div>
   );
 }

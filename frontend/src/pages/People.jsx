@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listPeople, listPending, listAllItems } from '../api';
-import List from '../components/List';
-import WarningBox from '../components/WarningBox';
+import { listPeople, listPending, listAllItems, markItemAsDiscussed } from '../api';
 
 export default function People() {
   const [people, setPeople] = useState([]);
@@ -10,6 +8,7 @@ export default function People() {
   const [discussedItems, setDiscussedItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [markingItem, setMarkingItem] = useState(null);
 
   useEffect(() => {
     loadPeople();
@@ -37,20 +36,33 @@ export default function People() {
     setLoading(true);
     setError(null);
     try {
-      // Load pending items
       const pending = await listPending(personId);
       setPendingItems(pending);
 
-      // Load discussed items
       const allItems = await listAllItems('discussed');
       const discussed = allItems
         .filter(item => item.related_person_id === personId)
-        .slice(0, 10); // Last 10 discussed
+        .slice(0, 20);
       setDiscussedItems(discussed);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMarkAsDiscussed = async (itemId) => {
+    if (!confirm('¿Marcar este item como discutido? (Debug)')) return;
+
+    setMarkingItem(itemId);
+    try {
+      await markItemAsDiscussed(itemId);
+      await loadPersonDetails(selectedPerson.id);
+      await loadPeople();
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setMarkingItem(null);
     }
   };
 
@@ -62,12 +74,15 @@ export default function People() {
 
   return (
     <div>
-      <h2>Personas — "¿Recuerdo como una persona real?"</h2>
+      <h1>👥 Personas</h1>
+      <p style={{ color: '#666', marginBottom: '20px' }}>
+        Lista de personas detectadas y sus items de memoria
+      </p>
 
       {error && <div className="error">Error: {error}</div>}
 
       <div className="card">
-        <h3>Lista de Personas</h3>
+        <h2>Lista de Personas</h2>
         {people.length === 0 ? (
           <div style={{ color: '#666' }}>No hay personas con items pendientes</div>
         ) : (
@@ -103,12 +118,9 @@ export default function People() {
       {selectedPerson && (
         <div>
           <div className="card">
-            <h3>Persona: {selectedPerson.name}</h3>
-            <div style={{ marginBottom: '10px' }}>
+            <h2>Persona: {selectedPerson.name}</h2>
+            <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
               <strong>ID:</strong> {selectedPerson.id}
-            </div>
-            <div style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
-              <em>Nota: Aliases y normalización gestionados por el backend</em>
             </div>
           </div>
 
@@ -117,45 +129,56 @@ export default function People() {
             {loading ? (
               <div>Cargando...</div>
             ) : (
-              <List
-                items={pendingItems}
-                renderItem={(item) => (
-                  <div className="item pending">
-                    <strong>{item.content}</strong>
-                    <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-                      Tipo: {item.type} | 
-                      Creado: {new Date(item.created_at).toLocaleString('es-ES')}
-                    </div>
-                    {item.content_fingerprint && (
-                      <div style={{ fontSize: '10px', color: '#999', marginTop: '3px', fontFamily: 'monospace' }}>
-                        Fingerprint: {item.content_fingerprint.substring(0, 20)}...
+              <div>
+                {pendingItems.map(item => (
+                  <div key={item.id} className="item pending" style={{ marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div style={{ flex: 1 }}>
+                        <strong>{item.content}</strong>
+                        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+                          Tipo: {item.type} | Creado: {new Date(item.created_at).toLocaleString('es-ES')}
+                        </div>
                       </div>
-                    )}
+                      <button
+                        onClick={() => handleMarkAsDiscussed(item.id)}
+                        disabled={markingItem === item.id}
+                        style={{
+                          background: '#28a745',
+                          fontSize: '12px',
+                          padding: '5px 10px',
+                          marginLeft: '10px',
+                        }}
+                      >
+                        {markingItem === item.id ? 'Marcando...' : 'Marcar discutido (Debug)'}
+                      </button>
+                    </div>
                   </div>
+                ))}
+                {pendingItems.length === 0 && (
+                  <div style={{ color: '#666' }}>No hay items pendientes</div>
                 )}
-                emptyMessage="No hay items pendientes para esta persona"
-              />
+              </div>
             )}
           </div>
 
           <div className="card">
-            <h3>Items Discutidos (últimos 10)</h3>
+            <h3>Items Discutidos (últimos 20)</h3>
             {loading ? (
               <div>Cargando...</div>
             ) : (
-              <List
-                items={discussedItems}
-                renderItem={(item) => (
-                  <div className="item discussed">
+              <div>
+                {discussedItems.map(item => (
+                  <div key={item.id} className="item discussed" style={{ marginBottom: '10px' }}>
                     <strong>{item.content}</strong>
                     <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-                      Tipo: {item.type} | 
-                      Creado: {new Date(item.created_at).toLocaleString('es-ES')}
+                      Tipo: {item.type} | Creado: {new Date(item.created_at).toLocaleString('es-ES')}
                     </div>
                   </div>
+                ))}
+                {discussedItems.length === 0 && (
+                  <div style={{ color: '#666' }}>No hay items discutidos</div>
                 )}
-                emptyMessage="No hay items discutidos para esta persona"
-              />
+              </div>
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 const API_BASE = 'http://localhost:8000/api/v1';
 
-async function fetchAPI(endpoint, options = {}) {
+export async function fetchAPI(endpoint, options = {}) {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
@@ -21,15 +21,14 @@ async function fetchAPI(endpoint, options = {}) {
   }
 }
 
-export async function sendInbox(text) {
+export async function sendInbox(text, useLLM = true) {
   return fetchAPI('/inbox', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, use_llm: useLLM }),
   });
 }
 
 export async function listPending(personId = null) {
-  // The endpoint doesn't support person_id filter, so we filter client-side
   const items = await fetchAPI('/memory/pending');
   if (personId) {
     return items.filter(item => item.related_person_id === personId);
@@ -43,7 +42,6 @@ export async function listAllItems(status = null) {
 }
 
 export async function listPeople() {
-  // Get all pending items and extract unique people
   const items = await listPending();
   const peopleMap = new Map();
   
@@ -73,12 +71,6 @@ export async function createEvent(title, startTime, endTime, personName = null) 
   });
 }
 
-export async function listEvents() {
-  // Endpoint doesn't exist yet, return empty array
-  // When implemented, it should be GET /calendar/events
-  return [];
-}
-
 export async function getBriefing(eventId) {
   return fetchAPI(`/calendar/events/${eventId}/briefing`);
 }
@@ -97,7 +89,29 @@ export async function listOutbox(status = null) {
     const url = status ? `/outbox?status=${status}` : '/outbox';
     return await fetchAPI(url);
   } catch (err) {
-    // If endpoint doesn't exist or returns error, return empty
     throw new Error('Outbox endpoint no disponible');
+  }
+}
+
+export async function markItemAsDiscussed(itemId) {
+  // Use the close event endpoint with a fake event or create a debug endpoint
+  // For now, we'll use a workaround: create a temporary event and close it
+  // This is a debug function, so it's acceptable
+  try {
+    // Create a temporary event
+    const now = new Date();
+    const event = await createEvent(
+      `Debug: Mark item ${itemId} as discussed`,
+      now.toISOString(),
+      new Date(now.getTime() + 60000).toISOString(),
+      null
+    );
+    
+    // Close the event with this item
+    await closeEvent(event.id, [itemId]);
+    
+    return { ok: true, message: 'Item marcado como discutido' };
+  } catch (err) {
+    throw new Error(`Error al marcar item: ${err.message}`);
   }
 }

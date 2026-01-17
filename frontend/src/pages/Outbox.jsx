@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { listOutbox } from '../api';
-import WarningBox from '../components/WarningBox';
 import JsonBox from '../components/JsonBox';
-import List from '../components/List';
 
 export default function Outbox() {
   const [notifications, setNotifications] = useState([]);
@@ -43,16 +41,18 @@ export default function Outbox() {
   if (!endpointAvailable) {
     return (
       <div>
-        <h2>Outbox / Observabilidad — "¿Qué iba a hacer el sistema?"</h2>
-        <WarningBox 
-          message="⚠️ Outbox no implementado aún en el backend. Este endpoint no está disponible."
-          type="error"
-        />
+        <h1>📤 Outbox</h1>
+        <p style={{ color: '#666', marginBottom: '20px' }}>
+          Notificaciones que el sistema enviaría
+        </p>
         <div className="card">
-          <p style={{ color: '#666' }}>
-            Cuando el backend implemente el endpoint <code>GET /api/v1/outbox</code>, 
-            aquí se mostrarán las notificaciones que el sistema habría enviado.
-          </p>
+          <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+            <p style={{ fontSize: '18px', marginBottom: '10px' }}>⚠️ Outbox no implementado aún</p>
+            <p>El endpoint <code>GET /api/v1/outbox</code> no está disponible en el backend.</p>
+            <p style={{ marginTop: '10px', fontSize: '14px' }}>
+              Cuando se implemente, aquí se mostrarán las notificaciones programadas.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -60,13 +60,16 @@ export default function Outbox() {
 
   return (
     <div>
-      <h2>Outbox / Observabilidad — "¿Qué iba a hacer el sistema?"</h2>
+      <h1>📤 Outbox</h1>
+      <p style={{ color: '#666', marginBottom: '20px' }}>
+        Notificaciones que el sistema enviaría (simulado, no se envía nada real)
+      </p>
 
       {error && <div className="error">Error: {error}</div>}
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3>Notificaciones</h3>
+          <h2>Notificaciones</h2>
           <button onClick={loadOutbox} disabled={loading}>
             {loading ? 'Cargando...' : '🔄 Refrescar'}
           </button>
@@ -74,101 +77,86 @@ export default function Outbox() {
       </div>
 
       {notifications.length === 0 && !loading && (
-        <WarningBox 
-          message="No hay notificaciones en el outbox."
-          type="info"
-        />
+        <div className="card">
+          <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+            No hay notificaciones en el outbox
+          </div>
+        </div>
       )}
 
-      <div className="card">
-        <List
-          items={notifications}
-          renderItem={(notification) => (
+      {notifications.map(notification => (
+        <div key={notification.id} className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+            <div>
+              <strong>Canal:</strong> {notification.channel}
+            </div>
             <div style={{
-              padding: '15px',
-              margin: '5px 0',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
+              color: getStatusColor(notification.status),
+              fontWeight: 'bold',
+              padding: '5px 10px',
               background: '#f8f9fa',
+              borderRadius: '4px',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div>
-                  <strong>Canal:</strong> {notification.channel}
-                </div>
-                <div style={{
-                  color: getStatusColor(notification.status),
-                  fontWeight: 'bold',
-                }}>
-                  {notification.status}
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '5px' }}>
-                <strong>Programado para:</strong> {new Date(notification.scheduled_for).toLocaleString('es-ES')}
-              </div>
-              
-              {notification.sent_at && (
-                <div style={{ marginBottom: '5px', color: '#28a745' }}>
-                  <strong>Enviado:</strong> {new Date(notification.sent_at).toLocaleString('es-ES')}
-                </div>
-              )}
-              
-              <div style={{ marginBottom: '5px' }}>
-                <strong>Evento ID:</strong> {notification.calendar_event_id}
-              </div>
-              
-              <div style={{ marginBottom: '5px' }}>
-                <strong>Persona ID:</strong> {notification.person_id}
-              </div>
-              
-              {notification.briefing_text && (
-                <div style={{ marginBottom: '5px' }}>
-                  <strong>Briefing:</strong>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '10px',
-                    borderRadius: '4px',
-                    marginTop: '5px',
-                    fontSize: '12px',
-                  }}>
-                    {notification.briefing_text}
-                  </div>
-                </div>
-              )}
-              
-              {notification.push_text && (
-                <div style={{ marginBottom: '5px' }}>
-                  <strong>Push Text:</strong>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '10px',
-                    borderRadius: '4px',
-                    marginTop: '5px',
-                    fontSize: '12px',
-                  }}>
-                    {notification.push_text}
-                  </div>
-                </div>
-              )}
-              
-              {notification.error && (
-                <div style={{ marginTop: '10px', color: '#dc3545' }}>
-                  <strong>Error:</strong> {notification.error}
-                </div>
-              )}
-              
-              <div style={{ fontSize: '11px', color: '#999', marginTop: '10px' }}>
-                Creado: {new Date(notification.created_at).toLocaleString('es-ES')}
+              {notification.status}
+            </div>
+          </div>
+          
+          <div style={{ marginBottom: '10px', fontSize: '14px' }}>
+            <strong>Programado para:</strong> {new Date(notification.scheduled_for).toLocaleString('es-ES')}
+          </div>
+          
+          {notification.sent_at && (
+            <div style={{ marginBottom: '10px', fontSize: '14px', color: '#28a745' }}>
+              <strong>Enviado:</strong> {new Date(notification.sent_at).toLocaleString('es-ES')}
+            </div>
+          )}
+          
+          <div style={{ marginBottom: '10px', fontSize: '14px' }}>
+            <strong>Evento ID:</strong> {notification.calendar_event_id}
+          </div>
+          
+          {notification.briefing_text && (
+            <div style={{ marginBottom: '10px' }}>
+              <strong>Briefing:</strong>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '10px',
+                borderRadius: '4px',
+                marginTop: '5px',
+                fontSize: '13px',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {notification.briefing_text}
               </div>
             </div>
           )}
-          emptyMessage="No hay notificaciones"
-        />
-      </div>
-
-      {notifications.length > 0 && (
-        <JsonBox data={notifications} title="Outbox (JSON)" />
-      )}
+          
+          {notification.push_text && (
+            <div style={{ marginBottom: '10px' }}>
+              <strong>Push Text:</strong>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '10px',
+                borderRadius: '4px',
+                marginTop: '5px',
+                fontSize: '13px',
+              }}>
+                {notification.push_text}
+              </div>
+            </div>
+          )}
+          
+          {notification.error && (
+            <div style={{ marginTop: '10px', color: '#dc3545' }}>
+              <strong>Error:</strong> {notification.error}
+            </div>
+          )}
+          
+          <div style={{ marginTop: '15px' }}>
+            <JsonBox data={notification} title="Payload Completo (JSON)" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
