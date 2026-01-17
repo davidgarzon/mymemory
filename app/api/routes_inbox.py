@@ -7,6 +7,7 @@ from typing import Optional, List
 from app.core.db import get_db
 from app.models import MemoryItem, MemoryItemType, MemoryItemStatus, Person
 from app.services.intent_parser import parse_intent
+from app.services.person_service import get_or_create_person
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +25,6 @@ class InboxResponse(BaseModel):
     created: bool = False
     memory_item: Optional[dict] = None
     pending_items: Optional[List[dict]] = None
-
-
-def get_or_create_person(db: Session, person_name: str) -> Person:
-    """Get existing person or create new one"""
-    person_name_clean = person_name.strip()
-    
-    # Try to find by display_name (case-insensitive)
-    person = db.query(Person).filter(
-        Person.display_name.ilike(person_name_clean)
-    ).first()
-    
-    if not person:
-        # Create new person
-        person = Person(display_name=person_name_clean, aliases=[])
-        db.add(person)
-        db.commit()
-        db.refresh(person)
-        logger.info(f"Created new person: {person_name_clean}")
-    
-    return person
 
 
 @router.post("", response_model=InboxResponse)
@@ -120,14 +101,12 @@ def process_inbox_text(
         
         # Filter by person if specified
         if data["related_person_name"]:
-            person = db.query(Person).filter(
-                Person.display_name.ilike(data["related_person_name"])
-            ).first()
-            if person:
+            try:
+                person = get_or_create_person(db, data["related_person_name"])
                 query = query.filter(MemoryItem.related_person_id == person.id)
                 logger.info(f"Filtering pending items by person: {data['related_person_name']} (id: {person.id})")
-            else:
-                logger.info(f"Person not found: {data['related_person_name']}")
+            except ValueError:
+                logger.info(f"Invalid person name: {data['related_person_name']}")
         
         items = query.order_by(MemoryItem.created_at.desc()).all()
         
