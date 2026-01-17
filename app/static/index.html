@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Second Memory - Testing Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #444;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.success {
+            background: #28a745;
+        }
+        button.success:hover {
+            background: #218838;
+        }
+        button.warning {
+            background: #ffc107;
+            color: #333;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        .memory-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .memory-item h3 {
+            margin-bottom: 8px;
+        }
+        .memory-item p {
+            color: #666;
+            margin: 5px 0;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-pending {
+            background: #ffc107;
+            color: #333;
+        }
+        .status-sent {
+            background: #28a745;
+            color: white;
+        }
+        #logs {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-info {
+            color: #4ec9b0;
+        }
+        .log-error {
+            color: #f48771;
+        }
+        .log-success {
+            color: #4ec9b0;
+        }
+        .briefing-box {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .connected {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Second Memory - Testing Interface</h1>
+
+        <!-- Crear Memory Item -->
+        <div class="section">
+            <h2>Crear Memory Item</h2>
+            <select id="memoryType">
+                <option value="reminder">Reminder</option>
+                <option value="idea">Idea</option>
+                <option value="note">Note</option>
+            </select>
+            <input type="text" id="memoryContent" placeholder="Ej: Hablar con Toni sobre subidas salariales">
+            <input type="text" id="memoryPerson" placeholder="Ej: Toni (opcional)">
+            <button onclick="createMemoryItem()">Crear Memory Item</button>
+        </div>
+
+        <!-- Inbox (Natural Language) -->
+        <div class="section">
+            <h2>Inbox (Natural Language)</h2>
+            <textarea id="inboxText" placeholder='Ej: "Recuérdame hablar con Toni sobre subidas salariales"'></textarea>
+            <button onclick="sendInboxText()">Send</button>
+        </div>
+
+        <!-- Mark as Discussed -->
+        <div class="section">
+            <h2>Mark as Discussed</h2>
+            <input type="text" id="markPerson" placeholder="Ej: Toni (opcional)">
+            <input type="text" id="markContent" placeholder="Ej: subidas salariales">
+            <button onclick="markDiscussed()">Mark Discussed</button>
+        </div>
+
+        <!-- Pre-meeting Briefing -->
+        <div class="section">
+            <h2>Pre-meeting Briefing</h2>
+            <input type="text" id="briefingPerson" placeholder="Ej: Toni">
+            <button onclick="generateBriefing()">Generate Briefing</button>
+            <div id="briefingResult"></div>
+        </div>
+
+        <!-- Google Calendar -->
+        <div class="section">
+            <h2>Google Calendar</h2>
+            <div id="calendarStatus"></div>
+            <button onclick="connectGoogleCalendar()">Connect Google Calendar</button>
+            <button class="success" onclick="syncCalendar()">Sync Events</button>
+        </div>
+
+        <!-- Próximos Eventos -->
+        <div class="section">
+            <h2>Próximos Eventos (7 días)</h2>
+            <div id="upcomingEvents"></div>
+        </div>
+
+        <!-- Briefing por Evento -->
+        <div class="section">
+            <h2>Briefing por Evento</h2>
+            <div id="eventBriefing"></div>
+        </div>
+
+        <!-- Outbox -->
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Outbox (Notificaciones Pendientes)</h2>
+                <button onclick="loadOutbox()">🔄 Refrescar</button>
+            </div>
+            <div id="outboxList"></div>
+        </div>
+
+        <!-- Memory Items Pendientes -->
+        <div class="section">
+            <h2>Memory Items Pendientes</h2>
+            <input type="text" id="filterPerson" placeholder="Ej: Toni (opcional)">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="loadPendingItems()">🔄 Refrescar</button>
+                <button onclick="filterPendingItems()">Filtrar</button>
+            </div>
+            <div id="pendingItemsList"></div>
+        </div>
+
+        <!-- Logs -->
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Logs del API</h2>
+                <div>
+                    <button onclick="toggleLogs()" id="pauseBtn">Pausar</button>
+                    <button onclick="clearLogs()">Limpiar</button>
+                </div>
+            </div>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let logsPaused = false;
+
+        function addLog(type, message) {
+            if (logsPaused) return;
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : 'log-info';
+            logsDiv.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function toggleLogs() {
+            logsPaused = !logsPaused;
+            document.getElementById('pauseBtn').textContent = logsPaused ? 'Reanudar' : 'Pausar';
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        async function createMemoryItem() {
+            const type = document.getElementById('memoryType').value;
+            const content = document.getElementById('memoryContent').value;
+            const person = document.getElementById('memoryPerson').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/memory/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type,
+                        content,
+                        related_person_name: person || null
+                    })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    addLog('success', `✅ Memory item creado: ${result.id}`);
+                    document.getElementById('memoryContent').value = '';
+                    document.getElementById('memoryPerson').value = '';
+                    loadPendingItems();
+                } else {
+                    addLog('error', `❌ Error: ${result.detail || JSON.stringify(result)}`);
+                }
+            } catch (error) {
+                addLog('error', `❌ Error: ${error.message}`);
+            }
+        }
+
+        async function sendInboxText() {
+            const text = document.getElementById('inboxText').value;
+            if (!text.trim()) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/inbox`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const result = await response.json();
+                if (result.ok) {
+                    addLog('success', `✅ Inbox procesado: ${result.intent}`);
+                    document.getElementById('inboxText').value = '';
+                    loadPendingItems();
+                } else {
+                    addLog('error', `❌ Error: ${result.detail || 'Error desconocido'}`);
+                }
+            } catch (error) {
+                addLog('error', `❌ Error: ${error.message}`);
+            }
+        }
+
+        async function markDiscussed() {
+            addLog('info', '⚠️ Mark discussed not implemented yet');
+        }
+
+        async function generateBriefing() {
+            const person = document.getElementById('briefingPerson').value;
+            if (!person.trim()) {
+                addLog('error', '❌ Por favor ingresa un nombre de persona');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/briefing/person?person_name=${encodeURIComponent(person)}`);
+                const result = await response.json();
+                if (response.ok) {
+                    const briefingDiv = document.getElementById('briefingResult');
+                    briefingDiv.innerHTML = `
+                        <div class="briefing-box">
+                            <strong>Briefing para ${result.person_name}:</strong><br><br>
+                            ${result.briefing_text.replace(/\n/g, '<br>')}
+                        </div>
+                    `;
+                    addLog('success', `✅ Briefing generado para ${result.person_name}`);
+                } else {
+                    addLog('error', `❌ Error: ${result.detail || 'Error desconocido'}`);
+                }
+            } catch (error) {
+                addLog('error', `❌ Error: ${error.message}`);
+            }
+        }
+
+        async function connectGoogleCalendar() {
+            addLog('info', '⚠️ Google Calendar connection not implemented yet');
+        }
+
+        async function syncCalendar() {
+            addLog('info', '⚠️ Calendar sync not implemented yet');
+        }
+
+        async function loadUpcomingEvents() {
+            try {
+                const response = await fetch(`${API_BASE}/google/upcoming`);
+                const result = await response.json();
+                // TODO: Implement display
+                addLog('info', '⚠️ Upcoming events display not implemented yet');
+            } catch (error) {
+                addLog('error', `❌ Error: ${error.message}`);
+            }
+        }
+
+        async function loadOutbox() {
+            try {
+                const response = await fetch(`${API_BASE}/outbox?status=pending`);
+                const result = await response.json();
+                const outboxDiv = document.getElementById('outboxList');
+                if (result.length === 0) {
+                    outboxDiv.innerHTML = '<p>No hay notificaciones pendientes</p>';
+                    return;
+                }
+                
+                outboxDiv.innerHTML = result.map(n => `
+                    <div class="memory-item">
+                        <h3>${n.person_name || 'Sin persona'}</h3>
+                        <p><strong>Channel:</strong> ${n.channel}</p>
+                        <p><strong>Push Text:</strong> ${n.push_text}</p>
+                        <span class="status-badge status-${n.status}">${n.status.toUpperCase()}</span>
+                        <div style="margin-top: 10px;">
+                            <button onclick="copyBriefing('${n.id}')">📋 Copy Briefing</button>
+                            <button class="success" onclick="sendWhatsApp('${n.id}')">📱 Send WhatsApp</button>
+                            <button class="success" onclick="sendTelegram('${n.id}')">✈️ Send Telegram</button>
+                            <button onclick="markSent('${n.id}')">✅ Mark Sent</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                addLog('error', `❌ Error cargando outbox: ${error.message}`);
+            }
+        }
+
+        async function loadPendingItems() {
+            const personFilter = document.getElementById('filterPerson').value.trim();
+            try {
+                let url = `${API_BASE}/memory/pending`;
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                const itemsDiv = document.getElementById('pendingItemsList');
+                let items = result;
+                if (personFilter) {
+                    items = items.filter(item => 
+                        item.related_person_name && 
+                        item.related_person_name.toLowerCase().includes(personFilter.toLowerCase())
+                    );
+                }
+                
+                if (items.length === 0) {
+                    itemsDiv.innerHTML = '<p>No hay items pendientes</p>';
+                    return;
+                }
+                
+                itemsDiv.innerHTML = items.map(item => `
+                    <div class="memory-item">
+                        <h3>${item.content}</h3>
+                        <p><strong>Tipo:</strong> ${item.type}</p>
+                        <p><strong>Persona:</strong> ${item.related_person_name || 'Sin persona'}</p>
+                        <p><strong>Fecha:</strong> ${new Date(item.created_at).toLocaleString('es-ES')}</p>
+                        <button onclick="markItemDiscussed('${item.id}')">✅ Mark Discussed</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                addLog('error', `❌ Error cargando items: ${error.message}`);
+                document.getElementById('pendingItemsList').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function filterPendingItems() {
+            loadPendingItems();
+        }
+
+        async function markItemDiscussed(itemId) {
+            addLog('info', `⚠️ Mark discussed for item ${itemId} not implemented yet`);
+        }
+
+        function copyBriefing(notificationId) {
+            addLog('info', `⚠️ Copy briefing not implemented yet`);
+        }
+
+        function sendWhatsApp(notificationId) {
+            addLog('info', `⚠️ Send WhatsApp not implemented yet`);
+        }
+
+        function sendTelegram(notificationId) {
+            addLog('info', `⚠️ Send Telegram not implemented yet`);
+        }
+
+        function markSent(notificationId) {
+            addLog('info', `⚠️ Mark sent not implemented yet`);
+        }
+
+        // Load initial data
+        window.onload = function() {
+            addLog('info', '🚀 Interface loaded');
+            loadPendingItems();
+            loadOutbox();
+            loadUpcomingEvents();
+        };
+    </script>
+</body>
+</html>
