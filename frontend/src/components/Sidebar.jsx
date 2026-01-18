@@ -5,6 +5,7 @@ export default function Sidebar({ currentPage, onPageChange }) {
     { id: 'inbox', label: '📥 Inbox', icon: '📥' },
     { id: 'people', label: '👥 Personas', icon: '👥' },
     { id: 'meetings', label: '📅 Reuniones', icon: '📅' },
+    { id: 'briefing', label: '📋 Briefing', icon: '📋' },
     { id: 'outbox', label: '📤 Outbox', icon: '📤' },
     { id: 'promptlab', label: '🧪 Prompt Lab', icon: '🧪' },
     { id: 'debug', label: '🐛 Debug', icon: '🐛' },

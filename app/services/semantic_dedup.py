@@ -105,7 +105,8 @@ def semantic_dedup(
         
     Returns:
         {
-            "action": "reuse" | "create",
+            "decision": "reuse_pending" | "already_discussed" | "create_new",
+            "matched_item": MemoryItem | None,
             "matched_item_id": UUID | None,
             "score": float | None
         }
@@ -115,7 +116,8 @@ def semantic_dedup(
     if not normalized_content:
         logger.warning(f"Empty normalized content for semantic dedup: '{content}'")
         return {
-            "action": "create",
+            "decision": "create_new",
+            "matched_item": None,
             "matched_item_id": None,
             "score": None
         }
@@ -125,7 +127,8 @@ def semantic_dedup(
     if not embedding:
         logger.warning(f"Failed to get embedding for content: '{content[:50]}...'")
         return {
-            "action": "create",
+            "decision": "create_new",
+            "matched_item": None,
             "matched_item_id": None,
             "score": None
         }
@@ -139,9 +142,9 @@ def semantic_dedup(
     else:
         memory_type = MemoryItemType.REMINDER  # REMINDER, LIST_ITEM, TASK all map to REMINDER
     
-    query = db.query(MemoryItem).filter(
+    # Base query for matching type, list_name, related_person_id, and embedding
+    base_query = db.query(MemoryItem).filter(
         MemoryItem.type == memory_type,
-        MemoryItem.status == MemoryItemStatus.PENDING,
         MemoryItem.embedding.isnot(None)  # Only items with embeddings
     )
     
@@ -161,73 +164,93 @@ def semantic_dedup(
         except:
             list_name = None
     
+    # Apply filters for list_name and related_person_id
     if list_name:
-        query = query.filter(MemoryItem.list_name == list_name)
+        base_query = base_query.filter(MemoryItem.list_name == list_name)
     else:
-        query = query.filter(MemoryItem.list_name.is_(None))
+        base_query = base_query.filter(MemoryItem.list_name.is_(None))
     
     # Filter by related_person_id: both null or both same
     if related_person_id:
-        query = query.filter(MemoryItem.related_person_id == related_person_id)
+        base_query = base_query.filter(MemoryItem.related_person_id == related_person_id)
     else:
-        query = query.filter(MemoryItem.related_person_id.is_(None))
+        base_query = base_query.filter(MemoryItem.related_person_id.is_(None))
     
-    # Step 4: Get top K=5 candidates (we'll calculate similarity in Python)
-    candidates = query.limit(5).all()
+    # Step 4: First search in PENDING items
+    pending_query = base_query.filter(MemoryItem.status == MemoryItemStatus.PENDING)
+    pending_candidates = pending_query.limit(5).all()
     
-    if not candidates:
-        logger.info(f"Semantic dedup: No candidates found for content: '{content[:50]}...'")
-        return {
-            "action": "create",
-            "matched_item_id": None,
-            "score": None
-        }
-    
-    # Step 5: Calculate cosine similarity with each candidate
-    best_match = None
-    best_score = 0.0
-    
+    # Step 5: Calculate cosine similarity with PENDING candidates
+    best_pending_match = None
+    best_pending_score = 0.0
     embedding_array = np.array(embedding)
     
-    for candidate in candidates:
-        # candidate.embedding is a Vector type from pgvector
-        # Use 'is None' instead of boolean check to avoid array ambiguity error
+    for candidate in pending_candidates:
         if candidate.embedding is None:
             continue
         
-        # candidate.embedding is a Vector type, convert to list
         candidate_embedding = list(candidate.embedding)
         score = cosine_similarity(embedding, candidate_embedding)
         
-        if score > best_score:
-            best_score = score
-            best_match = candidate
+        if score > best_pending_score:
+            best_pending_score = score
+            best_pending_match = candidate
     
-    # Step 6: Decision by score
-    if best_score >= 0.88:
-        action = "reuse"
-        matched_item_id = best_match.id if best_match else None
+    # If we found a good match in PENDING (>= 0.88), reuse it
+    if best_pending_score >= 0.88:
         logger.info(
-            f"Semantic dedup: REUSE (score={best_score:.3f}) | "
-            f"new='{content[:50]}...' | existing='{best_match.content[:50] if best_match else None}...'"
+            f"Semantic dedup: REUSE_PENDING (score={best_pending_score:.3f}) | "
+            f"new='{content[:50]}...' | existing='{best_pending_match.content[:50] if best_pending_match else None}...'"
         )
-    elif best_score >= 0.75:
-        action = "create"  # Below threshold, but log for analysis
-        matched_item_id = None
-        logger.info(
-            f"Semantic dedup: CREATE (score={best_score:.3f} < 0.88) | "
-            f"content='{content[:50]}...' | candidate='{best_match.content[:50] if best_match else None}...'"
-        )
-    else:
-        action = "create"
-        matched_item_id = None
-        logger.info(
-            f"Semantic dedup: CREATE (score={best_score:.3f} < 0.75) | "
-            f"content='{content[:50]}...'"
-        )
+        return {
+            "decision": "reuse_pending",
+            "matched_item": best_pending_match,
+            "matched_item_id": best_pending_match.id if best_pending_match else None,
+            "score": best_pending_score
+        }
+    
+    # Step 6: If no good match in PENDING, search in DISCUSSED items (only for REMINDER with person)
+    # Only check DISCUSSED if this is a REMINDER with a related_person_id
+    if memory_type == MemoryItemType.REMINDER and related_person_id:
+        discussed_query = base_query.filter(MemoryItem.status == MemoryItemStatus.DISCUSSED)
+        discussed_candidates = discussed_query.limit(5).all()
+        
+        best_discussed_match = None
+        best_discussed_score = 0.0
+        
+        for candidate in discussed_candidates:
+            if candidate.embedding is None:
+                continue
+            
+            candidate_embedding = list(candidate.embedding)
+            score = cosine_similarity(embedding, candidate_embedding)
+            
+            if score > best_discussed_score:
+                best_discussed_score = score
+                best_discussed_match = candidate
+        
+        # If we found a good match in DISCUSSED (>= 0.88), block creation
+        if best_discussed_score >= 0.88:
+            logger.info(
+                f"Semantic dedup: ALREADY_DISCUSSED (score={best_discussed_score:.3f}) | "
+                f"new='{content[:50]}...' | discussed='{best_discussed_match.content[:50] if best_discussed_match else None}...'"
+            )
+            return {
+                "decision": "already_discussed",
+                "matched_item": best_discussed_match,
+                "matched_item_id": best_discussed_match.id if best_discussed_match else None,
+                "score": best_discussed_score
+            }
+    
+    # Step 7: No match in PENDING or DISCUSSED, create new
+    logger.info(
+        f"Semantic dedup: CREATE_NEW (pending_score={best_pending_score:.3f} < 0.88) | "
+        f"content='{content[:50]}...'"
+    )
     
     return {
-        "action": action,
-        "matched_item_id": matched_item_id,
-        "score": best_score if best_match else None
+        "decision": "create_new",
+        "matched_item": None,
+        "matched_item_id": None,
+        "score": None
     }

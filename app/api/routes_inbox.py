@@ -245,6 +245,7 @@ def process_multiple_items(db: Session, items_data: List[Dict], original_text: s
     reused_items = []
     created_count = 0
     reused_count = 0
+    already_discussed_items = []  # Track items blocked by already_discussed
     
     for item_data in items_data:
         try:
@@ -321,24 +322,55 @@ def process_multiple_items(db: Session, items_data: List[Dict], original_text: s
                     related_person_id=related_person_id,
                 )
                 
-                # Check if we also need to filter by list_name for semantic matches
-                # Since list_name is not stored in MemoryItem, we check it here
-                semantic_item = None
-                if semantic_result["action"] == "reuse" and semantic_result["matched_item_id"]:
-                    semantic_item = db.query(MemoryItem).filter(
-                        MemoryItem.id == semantic_result["matched_item_id"]
-                    ).first()
-                    
-                    # Verify list_name matches (both null or both same)
-                    # Since list_name is not in DB, we accept the match
-                    # Future: could store list_name in MemoryItem or compare differently
+                # Handle semantic dedup decisions
+                decision = semantic_result.get("decision", "create_new")
                 
-                if semantic_result["action"] == "reuse" and semantic_item:
-                    # Reuse existing item (semantic match)
-                    memory_item = semantic_item
-                    reused_count += 1
-                    is_created = False
-                else:
+                if decision == "reuse_pending":
+                    # Reuse existing PENDING item (semantic match)
+                    semantic_item = semantic_result.get("matched_item")
+                    if semantic_item:
+                        memory_item = semantic_item
+                        reused_count += 1
+                        is_created = False
+                    else:
+                        # Fallback: query by ID if matched_item not provided
+                        if semantic_result.get("matched_item_id"):
+                            semantic_item = db.query(MemoryItem).filter(
+                                MemoryItem.id == semantic_result["matched_item_id"]
+                            ).first()
+                            if semantic_item:
+                                memory_item = semantic_item
+                                reused_count += 1
+                                is_created = False
+                            else:
+                                # Item not found, create new
+                                decision = "create_new"
+                        else:
+                            decision = "create_new"
+                
+                elif decision == "already_discussed":
+                    # Topic already discussed with this person - block creation
+                    blocked_person_name = None
+                    if related_person_id:
+                        person = db.query(Person).filter(Person.id == related_person_id).first()
+                        if person:
+                            blocked_person_name = person.display_name
+                    
+                    logger.info(
+                        f"Blocking item creation: topic already discussed with {blocked_person_name or 'person'} | "
+                        f"content='{content[:50]}...' | matched_item_id={semantic_result.get('matched_item_id')}"
+                    )
+                    
+                    # Track blocked item for response message
+                    already_discussed_items.append({
+                        "content": content,
+                        "person_name": blocked_person_name or "persona",
+                    })
+                    
+                    # Skip this item - don't add to created or reused
+                    continue
+                
+                if decision == "create_new":
                     # Create new memory item
                     # Calculate embedding for new item
                     from app.services.semantic_dedup import get_embedding
@@ -402,7 +434,14 @@ def process_multiple_items(db: Session, items_data: List[Dict], original_text: s
     # Build response
     all_items = created_items + reused_items
     detail_msg = None
-    if created_count > 0 and reused_count > 0:
+    
+    # If all items were blocked by already_discussed, return specific message
+    if already_discussed_items and created_count == 0 and reused_count == 0:
+        # Get person name from first blocked item (if all are for same person)
+        first_blocked = already_discussed_items[0]
+        blocked_person_name = first_blocked["person_name"]
+        detail_msg = f"Este tema ya fue tratado con {blocked_person_name}"
+    elif created_count > 0 and reused_count > 0:
         detail_msg = f"Creados {created_count} items, reutilizados {reused_count}"
     elif created_count > 0:
         detail_msg = f"Creados {created_count} items"

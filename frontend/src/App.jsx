@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import Inbox from './pages/Inbox';
 import People from './pages/People';
 import Meetings from './pages/Meetings';
+import Briefing from './pages/Briefing';
 import Outbox from './pages/Outbox';
 import PromptLab from './pages/PromptLab';
 import Debug from './pages/Debug';
@@ -18,6 +19,8 @@ export default function App() {
         return <People />;
       case 'meetings':
         return <Meetings />;
+      case 'briefing':
+        return <Briefing />;
       case 'outbox':
         return <Outbox />;
       case 'promptlab':

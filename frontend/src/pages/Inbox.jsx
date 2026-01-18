@@ -7,6 +7,7 @@ export default function Inbox() {
   const [useLLM, setUseLLM] = useState(true);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [alreadyDiscussedMessage, setAlreadyDiscussedMessage] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,10 +27,24 @@ export default function Inbox() {
       const result = await sendInbox(text, useLLM);
       logEntry.response = result;
       setLogs(prev => [logEntry, ...prev]);
+      
+      // Check if this is an "already discussed" block
+      if (result.ok === true && result.created === false && result.detail) {
+        // Show message for 5 seconds
+        setAlreadyDiscussedMessage(result.detail);
+        setTimeout(() => {
+          setAlreadyDiscussedMessage(null);
+        }, 5000);
+      } else {
+        // Clear any existing message if not blocked
+        setAlreadyDiscussedMessage(null);
+      }
+      
       setText('');
     } catch (err) {
       logEntry.error = err.message;
       setLogs(prev => [logEntry, ...prev]);
+      setAlreadyDiscussedMessage(null);
     } finally {
       setLoading(false);
     }
@@ -41,6 +56,28 @@ export default function Inbox() {
       <p style={{ color: '#666', marginBottom: '20px' }}>
         Envía mensajes al sistema y observa cómo los interpreta
       </p>
+
+      {alreadyDiscussedMessage && (
+        <div
+          style={{
+            background: '#fff3cd',
+            border: '2px solid #ffc107',
+            borderRadius: '6px',
+            padding: '14px 18px',
+            marginBottom: '20px',
+            color: '#856404',
+            fontSize: '15px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            animation: 'fadeIn 0.3s ease-in',
+          }}
+        >
+          <span style={{ fontSize: '20px' }}>ℹ️</span>
+          <span>{alreadyDiscussedMessage}</span>
+        </div>
+      )}
 
       <div className="card">
         <form onSubmit={handleSubmit}>

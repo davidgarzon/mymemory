@@ -116,6 +116,18 @@ export async function markItemAsDiscussed(itemId) {
   }
 }
 
+// Briefing API
+export async function getBriefingForPerson(personId) {
+  return fetchAPI(`/briefing/${personId}`);
+}
+
+export async function closeBriefing(personId, itemIds) {
+  return fetchAPI(`/briefing/${personId}/close`, {
+    method: 'POST',
+    body: JSON.stringify({ item_ids: itemIds }),
+  });
+}
+
 // Prompt Lab API
 export async function listPromptBlocks() {
   return fetchAPI('/debug/prompt');

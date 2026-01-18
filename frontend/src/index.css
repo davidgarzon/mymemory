@@ -129,3 +129,28 @@ textarea {
   border-bottom: 2px solid #007bff;
   padding-bottom: 5px;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes highlight {
+  0%, 100% {
+    background: #f8fff9;
+    border: '1px solid #d4edda';
+    borderLeft: '4px solid #28a745';
+  }
+  50% {
+    background: #fff3cd;
+    border: '2px solid #ffc107';
+    borderLeft: '4px solid #ffc107';
+    boxShadow: '0 0 10px rgba(255, 193, 7, 0.3)';
+  }
+}
