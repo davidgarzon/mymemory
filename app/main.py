@@ -9,7 +9,7 @@ import os
 
 from app.core.db import get_db
 from app.core.config import settings
-from app.api import routes_memory, routes_briefing, routes_inbox, routes_calendar, routes_outbox, routes_whatsapp, routes_telegram
+from app.api import routes_memory, routes_inbox, routes_calendar, routes_outbox, routes_whatsapp, routes_telegram, routes_prompt_lab, routes_briefing
 
 # Log settings for debugging
 logger = logging.getLogger(__name__)
@@ -60,6 +60,7 @@ app.include_router(routes_calendar.router, prefix=settings.API_V1_PREFIX)
 app.include_router(routes_outbox.router, prefix=settings.API_V1_PREFIX)
 app.include_router(routes_whatsapp.router, prefix=settings.API_V1_PREFIX)
 app.include_router(routes_telegram.router, prefix=settings.API_V1_PREFIX)
+app.include_router(routes_prompt_lab.router, prefix=settings.API_V1_PREFIX)
 
 # Mount static files for frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

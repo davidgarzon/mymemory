@@ -1,7 +1,8 @@
 import json
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from openai import OpenAI
+from sqlalchemy.orm import Session
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -14,41 +15,44 @@ def get_openai_client() -> Optional[OpenAI]:
     global _client
     if _client is None:
         if not settings.OPENAI_API_KEY:
-            logger.warning("OPENAI_API_KEY not configured, LLM parser disabled")
+            logger.warning("OPENAI_API_KEY not configured, LLM disabled")
             return None
-        _client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        try:
+            _client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenAI client: {e}")
+            return None
     return _client
 
 
 LLM_SYSTEM_PROMPT = """
 Eres un parser semántico para una aplicación de memoria personal.
 
-Tu tarea es analizar un mensaje en español y devolver EXCLUSIVAMENTE JSON VÁLIDO,
-sin texto adicional, sin markdown y sin explicaciones.
+Devuelve EXCLUSIVAMENTE JSON válido.
+NO escribas texto adicional.
+NO uses markdown.
+NO expliques nada.
 
-Reglas estrictas:
+REGLAS:
+- Analiza el mensaje en español
+- Extrae TODOS los items implícitos o explícitos
+- Divide listas como "arroz y manzanas" en items separados
 - NO inventes personas
-- Solo devuelve una persona si el texto indica claramente interacción con una persona:
-  - "hablar con X"
-  - "reunión con X"
-  - "llamar a X"
-  - "decirle a X"
-- Si no hay persona explícita, usa null
-- Si hay múltiples temas en el mensaje, divídelos en múltiples items
-- Normaliza cada item en una frase clara y autocontenida
+- Solo devuelve persona si hay interacción explícita:
+  "hablar con X", "reunión con X", "llamar a X", "decirle a X"
 
-Listas:
-- Si el usuario dice "añade X" sin especificar lista → list_name = "shopping"
-- Si dice "añade a la lista de tareas X" → list_name = "tasks"
-- Si dice "añade a la lista Y X" → list_name = Y
+LISTAS:
+- "añade X" → LIST_ITEM, list_name="shopping"
+- "añade a la lista de tareas X" → TASK, list_name="tasks"
+- "añade a la lista Y X" → list_name=Y
 
-Tipos permitidos:
+TIPOS PERMITIDOS:
 - REMINDER
 - IDEA
 - LIST_ITEM
 - TASK
 
-Formato EXACTO de salida:
+FORMATO EXACTO:
 
 {
   "intent": "create_memory" | "unknown",
@@ -62,42 +66,42 @@ Formato EXACTO de salida:
   ]
 }
 
-Si no puedes entender el mensaje, devuelve:
+Si no entiendes el mensaje:
 
 {
   "intent": "unknown",
-  "reason": "string"
+  "person": null,
+  "items": []
 }
 """.strip()
 
 
-def parse_with_llm(text: str) -> Dict:
-    """
-    Parse complex natural language text using LLM.
-
-    Returns one of:
-    - {
-        "intent": "create_memory",
-        "person": str | None,
-        "items": [...]
-      }
-    - {
-        "intent": "unknown",
-        "reason": str
-      }
-    """
+def parse_with_llm(text: str, db: Optional[Session] = None) -> Dict:
     client = get_openai_client()
     if not client:
         logger.error("LLM parser called but OpenAI client not available")
-        return {"intent": "unknown", "reason": "llm_not_available"}
+        return {
+            "intent": "unknown",
+            "person": None,
+            "items": []
+        }
 
     try:
+        # Get active prompt from database (dynamic)
+        system_prompt = LLM_SYSTEM_PROMPT
+        if db:
+            try:
+                from app.services.prompt_service import get_active_prompt
+                system_prompt = get_active_prompt(db)
+            except Exception as e:
+                logger.warning(f"Could not load active prompt from DB: {e}, using default")
+        
         logger.info(f"LLM parsing text: '{text[:120]}...'")
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": LLM_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text},
             ],
             temperature=0.1,
@@ -108,72 +112,59 @@ def parse_with_llm(text: str) -> Dict:
         raw = response.choices[0].message.content.strip()
         parsed = json.loads(raw)
 
-        # ---- VALIDATION ----
-
         if not isinstance(parsed, dict):
-            raise ValueError("LLM response is not a JSON object")
+            raise ValueError("LLM response is not an object")
 
         intent = parsed.get("intent")
         if intent not in {"create_memory", "unknown"}:
-            raise ValueError("Invalid or missing intent")
-
-        if intent == "unknown":
-            return {
-                "intent": "unknown",
-                "reason": parsed.get("reason", "unknown"),
-            }
-
-        items = parsed.get("items")
-        if not isinstance(items, list) or not items:
-            raise ValueError("Missing or empty items list")
+            raise ValueError("Invalid intent")
 
         person = parsed.get("person")
         if person is not None and not isinstance(person, str):
-            raise ValueError("Invalid person field")
+            person = None
 
-        validated_items = []
+        items = parsed.get("items", [])
+        if not isinstance(items, list):
+            items = []
+
+        validated_items: List[Dict] = []
 
         for item in items:
             if not isinstance(item, dict):
-                raise ValueError("Item is not an object")
+                continue
 
             item_type = item.get("type")
-            if item_type not in {"REMINDER", "IDEA", "LIST_ITEM", "TASK"}:
-                raise ValueError(f"Invalid item type: {item_type}")
-
             content = item.get("content")
-            if not content or not isinstance(content, str):
-                raise ValueError("Item content missing or invalid")
-
             list_name = item.get("list_name")
 
+            if item_type not in {"REMINDER", "IDEA", "LIST_ITEM", "TASK"}:
+                continue
+
+            if not isinstance(content, str) or not content.strip():
+                continue
+
             if item_type in {"LIST_ITEM", "TASK"}:
-                if list_name is None:
+                if not list_name:
                     list_name = "shopping" if item_type == "LIST_ITEM" else "tasks"
             else:
                 list_name = None
 
-            validated_items.append(
-                {
-                    "type": item_type,
-                    "content": content.strip(),
-                    "list_name": list_name,
-                }
-            )
-
-        logger.info(
-            f"LLM parser succeeded: intent={intent}, person={person}, items={len(validated_items)}"
-        )
+            validated_items.append({
+                "type": item_type,
+                "content": content.strip(),
+                "list_name": list_name,
+            })
 
         return {
-            "intent": "create_memory",
+            "intent": intent,
             "person": person,
             "items": validated_items,
         }
 
     except Exception as e:
-        logger.error(f"LLM parser failed: {e}", exc_info=True)
+        logger.error(f"LLM parser error: {e}", exc_info=True)
         return {
             "intent": "unknown",
-            "reason": "llm_parse_error",
+            "person": None,
+            "items": []
         }

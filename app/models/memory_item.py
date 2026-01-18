@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 import enum
 
 from app.core.db import Base
@@ -29,6 +30,9 @@ class MemoryItem(Base):
     normalized_summary = Column(Text, nullable=True)
     content_fingerprint = Column(String, nullable=True, index=True)
     related_person_id = Column(UUID(as_uuid=True), ForeignKey("person.id"), nullable=True, index=True)
+    list_name = Column(String, nullable=True, index=True)
+    embedding = Column(Vector(1536), nullable=True)  # OpenAI text-embedding-3-small dimension
+    semantic_group_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     due_at = Column(DateTime, nullable=True)
     status = Column(SQLEnum(MemoryItemStatus), nullable=False, default=MemoryItemStatus.PENDING, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)

@@ -5,6 +5,7 @@ from app.models.calendar_event import CalendarEvent
 from app.models.interaction_log import InteractionLog, InteractionLogAction
 from app.models.google_oauth_token import GoogleOAuthToken
 from app.models.notification_outbox import NotificationOutbox, NotificationChannel, NotificationStatus
+from app.models.prompt_block import PromptBlock
 
 __all__ = [
     "Person",
@@ -12,6 +13,7 @@ __all__ = [
     "MemoryItemStatus",
     "MemoryItemType",
     "MemoryItemEmbedding",
+    "PromptBlock",
     "CalendarEvent",
     "InteractionLog",
     "InteractionLogAction",
@@ -19,4 +21,5 @@ __all__ = [
     "NotificationOutbox",
     "NotificationChannel",
     "NotificationStatus",
+    "PromptBlock",
 ]
